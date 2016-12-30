@@ -1,0 +1,8 @@
+README.txt
+InfiniteJest/__init__.py
+InfiniteJest/batch_selector.py
+InfiniteJest.egg-info/PKG-INFO
+InfiniteJest.egg-info/SOURCES.txt
+InfiniteJest.egg-info/dependency_links.txt
+InfiniteJest.egg-info/requires.txt
+InfiniteJest.egg-info/top_level.txt
