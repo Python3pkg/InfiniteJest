@@ -44,6 +44,9 @@ class DEA_Error(Exception):
 class DEA():
     def __init__(self, inputs, outputs, model = 'input'):
 
+        max_models = ['output', 'ccr']
+        min_models = ['input']
+
         if type(inputs) == np.ndarray:
             self.inputs = inputs
         else:
@@ -68,9 +71,13 @@ class DEA():
         self.num_inputs = self.inputs.shape[1]
         self.num_outputs = self.outputs.shape[1]
         self.num_dmus = self.inputs.shape[0]
-        
-        self.lp_list = [pulp.LpProblem("DEA"+str(j), pulp.LpMinimize)
-                for j in range(self.num_dmus)]
+        if self.model in min_models: 
+            self.lp_list = [pulp.LpProblem("DMU "+str(j), pulp.LpMinimize)
+                    for j in range(self.num_dmus)]
+        elif self.model in max_models:
+            self.lp_list = [pulp.LpProblem("DMU "+str(j), pulp.LpMaximize)
+                    for j in range(self.num_dmus)]
+
         self._build_variables()
         self._formulate_lp()
 
@@ -91,12 +98,11 @@ class DEA():
         for j, dmu in enumerate(self.outputs):
             dmu_outputs = []
             for r, output in enumerate(dmu):
-                # var = 'y_' + str(r) + str(j)
-                # lp_var = pulp.LpVariable(var, lowBound = 0, cat = 'Continuous')
                 dmu_outputs.append(output)
                 if j == 1:
                     var = 'u_' + str(r)
-                    lp_var = pulp.LpVariable(var, lowBound = 0, cat = 'Continuous')
+                    lp_var = pulp.LpVariable(var, lowBound = 0, 
+                            cat = 'Continuous')
                     u.append(lp_var)
             y.append(dmu_outputs)
         y = np.array(y)
@@ -111,12 +117,11 @@ class DEA():
         for j, dmu in enumerate(self.inputs):
             dmu_inputs = []
             for i, input in enumerate(dmu):
-                #var = 'x_' + str(i) + str(j)
-                # lp_var = pulp.LpVariable(var, lowBound = 0, cat = 'Continuous')
                 dmu_inputs.append(input)
                 if j == 1:
                     var = 'v_' + str(i)
-                    lp_var = pulp.LpVariable(var, lowBound = 0, cat = 'Continuous')
+                    lp_var = pulp.LpVariable(var, lowBound = 0, 
+                            cat = 'Continuous')
                     v.append(lp_var)
             x.append(dmu_inputs)
         x = np.array(x)
@@ -129,34 +134,112 @@ class DEA():
         z = []
         for j, dmu in enumerate(self.inputs):
             var = 'z_' + str(j)
-            lp_var = pulp.LpVariable(var, lowBound = 0, cat = 'Continuous')
+            lp_var = pulp.LpVariable(var, lowBound = 0, 
+                    cat = 'Continuous')
             z.append(lp_var)
         z = np.array(z)
         self.z = z
 
     def _formulate_lp(self):
+        if self.model == 'input':
+            self._formulate_input_lp()
+        elif self.model == 'output':
+            self._formulate_output_lp()
+        elif self.model == 'ccr':
+            self._formulate_ccr_lp()
+
+    def _formulate_input_lp(self):
         y = self.y; u = self.u
         x = self.x; v = self.v
         z = self.z
-       
+
         # Input reducing model
         for j, lp in enumerate(self.lp_list):
 
             # Build objective function
-            E = pulp.LpVariable('E', lowBound = 0, cat = 'Continuous')
+            E = pulp.LpVariable('E', lowBound = 0, 
+                    cat = 'Continuous')
             lp += E, 'E'
 
             # Build constraints
-            f = 0
             for i in range(self.num_inputs):
                 f = 0
                 for jj in range(self.num_dmus):
                     f += x[i][jj]*z[jj]
-                lp += f <= x[i][j]*E
+                lp += f <= E*x[i][j]
+
+            for r in range(self.num_outputs):
+                f = 0
+                for jj in range(self.num_dmus):
+                    f += z[jj]*y[r][jj]
+                lp += f >= y[r][j]
 
             f = 0
             for jj in range(self.num_dmus):
                 f += z[jj]
+            lp += f == 1
+
+    def _formulate_output_lp(self):
+        y = self.y; u = self.u
+        x = self.x; v = self.v
+        z = self.z
+
+        # Output increasing  model
+        for j, lp in enumerate(self.lp_list):
+
+            # Build objective function
+            E = pulp.LpVariable('E', lowBound = 0, 
+                    cat = 'Continuous')
+            lp += E, 'E'
+
+            # Build constraints
+            for i in range(self.num_inputs):
+                f = 0
+                for jj in range(self.num_dmus):
+                    f += x[i][jj]*z[jj]
+                lp += f <= x[i][j]
+
+            for r in range(self.num_outputs):
+                f = 0
+                for jj in range(self.num_dmus):
+                    f += z[jj]*y[r][jj]
+                lp += f >= E*y[r][j]
+
+            f = 0
+            for jj in range(self.num_dmus):
+                f += z[jj]
+            lp += f == 1
+
+    def _formulate_ccr_lp(self):
+        y = self.y; u = self.u
+        x = self.x; v = self.v
+        z = self.z
+
+        # CCR model
+        # Note, the problem needs to be transformed
+        # so that it can be solved with an LP
+        for j, lp in enumerate(self.lp_list):
+
+            # Build objective function
+            E = pulp.LpVariable('E', lowBound = 0, 
+                    cat = 'Continuous')
+            h = 0
+            for r in range(self.num_outputs):
+                h += u[r]*y[r][j]
+            lp += h, 'h'
+
+            # Build constraints
+            for jj in range(self.num_dmus):
+                f= 0
+                for r in range(self.num_outputs):
+                    f += u[r]*y[r][jj]
+                for i in range(self.num_inputs):
+                    f -= v[i]*x[i][jj]
+                lp += f <= 0
+
+            f = 0
+            for i in range(self.num_inputs):
+                f += v[i]*x[i][j]
             lp += f == 1
 
     def solve(self):

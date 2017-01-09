@@ -1,0 +1,4 @@
+batch/*
+dist/*
+*.pyc
+InfiniteJest.egg-info/*
