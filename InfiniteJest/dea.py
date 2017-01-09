@@ -11,25 +11,6 @@ def build_example():
     df = pd.DataFrame(df_dict)
     return df
 
-
-def test():
-    my_lp_problem = pulp.LpProblem("My LP Problem", pulp.LpMaximize)
-    x = pulp.LpVariable('x', lowBound = 0, cat = 'Continuous')
-    y = pulp.LpVariable('y', lowBound = 2, cat = 'Continuous')
-
-    # Objective Function
-    h = 0
-    h += 4*x + 3*y
-    #my_lp_problem += 4*x + 3*y, "Z"
-    my_lp_problem += h, "Z"
-
-    # Constraints
-    my_lp_problem += 2*y <= 25-x
-    my_lp_problem += 4*y >= 2*x-8
-    my_lp_problem += 2 <= 2*x - 5
-
-    return my_lp_problem
-
 class DEA_Error(Exception):
     """
     DEA_Error Class
