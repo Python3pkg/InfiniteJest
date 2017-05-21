@@ -1,4 +1,4 @@
-from __future__ import division
+
 import numpy as np
 import conf
 import simpy
@@ -25,8 +25,8 @@ def generate_orders(env, factory, interval):
     Generates new orders and processes them if the expected
     wait time for an item is less than the given threshold
     """
-    items = factory.output.keys()
-    print 'here'
+    items = list(factory.output.keys())
+    print('here')
     while True:
         next_order = np.random.exponential(1/interval)
         yield env.timeout(next_order)
